@@ -14,29 +14,29 @@ logging.info(f'{datetime.datetime.now()}:......................................'
 
 class ServerSocket:
 
-    serverSocket = None
+    server_socket = None
     host = "127.0.0.1"
     welcome_string = " has joined chat!"
 
     def __init__(self, socket, threads):
-        self.serverSocket = socket.socket()
+        self.server_socket = socket.socket()
         self.host = "localhost"
 
     def start_server(self, port):
-        self.serverSocket.bind((self.host, port))
-        self.serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.serverSocket.listen()
+        self.server_socket.bind((self.host, port))
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_socket.listen()
 
         while True:
             try:
                 logging.info(f'{datetime.datetime.now()}: Waiting for connections...')
-                conn, addr = self.serverSocket.accept()
+                conn, addr = self.server_socket.accept()
                 logging.info(f'{datetime.datetime.now()}: New connection from client: ', addr)
-                thrd = ThreadSocket(conn, threads, self.serverSocket, addr)
+                thrd = ThreadSocket(conn, threads, self.server_socket, addr)
                 threads.append(thrd)
                 thrd.start()
             except OSError:
-                self.serverSocket.close()
+                self.server_socket.close()
                 logging.info(f'{datetime.datetime.now()}: Socket closed by the server')
                 sys.exit(2)
             except KeyboardInterrupt:
@@ -45,11 +45,10 @@ class ServerSocket:
 
     def server_close(self):
         try:
-            self.serverSocket.close()
+            self.server_socket.close()
         except OSError:
                             logging.info(f'{datetime.datetime.now()}: ERROR: Unable to close server socket')
 class ThreadSocket(threading.Thread):
-    # connection = None
     global addr
 
     def __init__(self, connection, threads, serverSocket, addr):
@@ -60,7 +59,6 @@ class ThreadSocket(threading.Thread):
         self.addr = addr
 
     def run(self):
-        # socket data exchange
 
         while True:
             try:
@@ -70,7 +68,7 @@ class ThreadSocket(threading.Thread):
                 stringData = stringData + data.decode()
                 if 'exit' in stringData:
                     threads.remove(self.get_thread())
-                    print('Client disconnected...')
+                    logging.info(f'{datetime.datetime.now()}: Client disconnected...')
                 for thrd in threads:
                     thrd.__send_all__(thrd, stringData)
             except Exception:
@@ -83,7 +81,7 @@ class ThreadSocket(threading.Thread):
                 break
 
     def __send_all__(self, th, string_data):
-        # send message to all sockets
+        # send message to all connected clients
         th.get_connection().send((string_data).encode())
 
     def get_connection(self):
