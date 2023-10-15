@@ -4,6 +4,7 @@ import sys
 import logging, datetime
 
 threads = []
+users = {}
 
 # logger format
 logger = logging.getLogger()
@@ -14,6 +15,7 @@ logging.info(f'{datetime.datetime.now()}:......................................'
 
 class ServerSocket:
 
+    global i  # number of users
     server_socket = None
     host = "127.0.0.1"
     welcome_string = " has joined chat!"
@@ -26,13 +28,18 @@ class ServerSocket:
         self.server_socket.bind((self.host, port))
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.listen()
+        i = 0
+
 
         while True:
             try:
                 logging.info(f'{datetime.datetime.now()}: Waiting for connections...')
                 conn, addr = self.server_socket.accept()
-                logging.info(f'{datetime.datetime.now()}: New connection from client: ', addr)
+                logging.info(f'{datetime.datetime.now()}: New connection from client: ')
+                i = i + 1
+                users[i] = [conn]
                 thrd = ThreadSocket(conn, threads, self.server_socket, addr)
+                users.get(i).append(thrd)
                 threads.append(thrd)
                 thrd.start()
             except OSError:
@@ -47,32 +54,46 @@ class ServerSocket:
         try:
             self.server_socket.close()
         except OSError:
-                            logging.info(f'{datetime.datetime.now()}: ERROR: Unable to close server socket')
+            logging.info(f'{datetime.datetime.now()}: ERROR: Unable to close server socket')
 class ThreadSocket(threading.Thread):
     global addr
 
-    def __init__(self, connection, threads, serverSocket, addr):
+    def __init__(self, connection, threads, server_socket, addr):
         threading.Thread.__init__(self)
+        self.exitflag = False
         self.connection = connection
         self.shutdown_flag = threading.Event()
-        self.serverSocket = serverSocket
+        self.serverSocket = server_socket
         self.addr = addr
 
     def run(self):
 
         while True:
+            if self.exitflag:
+                break
             try:
-                stringData = ''
+                string_data = ''
                 data = self.connection.recv(4096)
                 if not data: break
-                stringData = stringData + data.decode()
-                if 'exit' in stringData:
+                string_data = string_data + data.decode()
+                if 'has just connected' in string_data:
+                    user = string_data.split(' ')[0]
+                    users.get(list(users)[-1]).append(user)
+                    logging.info(f'{users.get(list(users)[-1])} is now in the chat')
+                if 'exit' in string_data:
                     threads.remove(self.get_thread())
-                    logging.info(f'{datetime.datetime.now()}: Client disconnected...')
-                for thrd in threads:
-                    thrd.__send_all__(thrd, stringData)
+                    keyval = None
+                    for k, v in users.items():
+                        if self.get_thread() in v:
+                            v[0].close()
+                            v[1].exitflag = True
+                            keyval = k
+                    del users[keyval]
+                    logging.info(f'{datetime.datetime.now()}: client disconnected...')
+                else:
+                    for thrd in threads:
+                        thrd.__send_all__(thrd, string_data)
             except Exception:
-                logging.info(f'{datetime.datetime.now()}: Socket error: ', socket.error)
                 logging.info(f'{datetime.datetime.now()}: traceback.format_exc()')
                 logging.info(f'{datetime.datetime.now()}: Client disconnected')
                 self.connection.close()
@@ -101,11 +122,40 @@ class ServerManagerThrd(threading.Thread):
         self.stop_event = stop_event
 
     def run(self):
+        commands = ['quit', 'kick', 'listusers']
         while not self.stop_event.is_set():
             command = input("You can input command to manage server\n")
+            if command not in commands:
+                print('Unknown option: \'', command, '\'')
+            if command == 'listusers':
+                for k, v in users.items():
+                    print('User id: ', k, 'name: ', v[2], ' params: ', v[0], ',', v[1])
+
             if (command == "quit"):
+                for th in threads:
+                    th.exitflag = True
                 self.server_socket.server_close()
-                self.stop_event.set()
+                self.stop_event.set() 
+                sys.exit(4)
+            if 'kick' in command:
+                u = input('Input user to kick: ')
+                if not u:
+                    print('No such user or username is empty!')
+                else:
+                    logger.info(f'{u} will be disconnected from the server by admin')
+                    keyval = None
+                    for k, v in users.items():
+                        if u in v:
+                            print('User found: ', u, 'key: ', k)
+                            print('Socket: ', v[0])
+                            try:
+                                v[0].close()
+                                v[1].exitflag = True
+                                threads.remove(v[1].get_thread())
+                                keyval = k
+                            except Exception:
+                                print('Unable to close socket!')
+                    del users[keyval]
 
 def sig_kill_handler():
     # all threads interrupting
