@@ -9,7 +9,7 @@ def main():
 
     nickname = input('Please, input nickname: ')
 
-    def __read_socket__():
+    def read_socket():
         while 1:
             try:
                 from_server = client.recv(4096).decode()
@@ -23,7 +23,7 @@ def main():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect((HOST, PORT))
 
-    thrdClient = threading.Thread(target=__read_socket__)
+    thrdClient = threading.Thread(target=read_socket)
     thrdClient.start()
 
     client.send(f'{nickname} has just connected!'.encode())
