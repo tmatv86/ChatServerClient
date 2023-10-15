@@ -7,8 +7,6 @@ from PyQt6.QtCore import QSize
 
 class ClientSocket():
 
-    HOST = ""
-    PORT = 0
     client = 0
     client_thrd = None
     stop_thread = False
@@ -69,14 +67,13 @@ class ExampleWindow(QMainWindow):
         layout.addWidget(button)
 
         button = QPushButton("Exit", self)
-        #button.clicked.connect(QApplication.instance().quit)
         button.clicked.connect(self.exit_chat)
         layout.addWidget(button)
 
     def connect(self):
         print('Connect to server...')
         try:
-            self.client_socket = ClientSocket()
+            self.client_socket = ClientSocket('127.0.0.1', 65531)
             self.thrdClient = threading.Thread(target=self.client_socket.read_from_socket)
             self.thrdClient.start()
             print('Connection established successfully!')

@@ -8,8 +8,8 @@ threads = []
 # logger format
 logger = logging.getLogger()
 logging.basicConfig(filename="chat_server.log", level=logging.DEBUG)
-logging.info(f'{datetime.datetime.now()}:Chat server started main ChatServer.py')
-logging.info(f'{datetime.datetime.now()}:Debug level: logger.debug')
+logging.info(f'{datetime.datetime.now()}: Chat server started main ChatServer.py')
+logging.info(f'{datetime.datetime.now()}: Debug level: logger.debug')
 logging.info(f'{datetime.datetime.now()}:......................................')
 
 class ServerSocket:
