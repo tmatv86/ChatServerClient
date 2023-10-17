@@ -30,7 +30,6 @@ class ServerSocket:
         self.server_socket.listen()
         i = 0
 
-
         while True:
             try:
                 logging.info(f'{datetime.datetime.now()}: Waiting for connections...')

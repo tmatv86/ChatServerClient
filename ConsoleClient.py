@@ -5,7 +5,7 @@ import threading
 def main():
 
     HOST = "127.0.0.1"
-    PORT = 65531
+    PORT = 65534
 
     nickname = input('Please, input nickname: ')
 
@@ -34,8 +34,9 @@ def main():
     while True:
         try:
             string = input("")
-            str = f"{nickname}: " + string
-            client.send(str.encode())
+            str1 = f"{nickname}: " + string
+            print(str1)
+            client.send(str1.encode())
             if string == 'exit':
                 exitflag = True
                 client.close()
