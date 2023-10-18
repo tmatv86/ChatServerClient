@@ -2,7 +2,7 @@ import socket, threading
 import select
 import traceback
 import datetime, logging
-import sys
+import sys, signal
 
 users = {}
 
@@ -23,7 +23,7 @@ class ServerSocket:
 
     socket = None
     sockets = []
-    lsock = None
+    server_socket = None
     welcome_string = " has joined chat!"
 
     def __init__(self, host, port):
@@ -31,25 +31,27 @@ class ServerSocket:
         self.port = port
         self.socket = socket.socket()
         self.stop_falg = False
+        signal.signal(signal.SIGINT, self.close_server)
 
     def binding(self):
-        self.lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.lsock.bind((self.host, self.port))
-        self.lsock.listen(10)
-        self.lsock.setblocking(False)  # non-blocking sockets
-        self.sockets.append(self.lsock)
-        # print("Socket is in: ", self.sockets)
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(10)
+        self.sockets.append(self.server_socket)
+        self.server_socket.setblocking(False)  # non-blocking sockets
         print(f"Listening on host and port: {(self.host, self.port)}")
+
 
     def start_server(self):
         global num_of_clients
         logging.info(f'{datetime.datetime.now()}: Waiting for connections...')
+
         while not self.stop_falg:
             rread, rwrite, err = select.select(self.sockets, [], [], 0)
             for sock in rread:
-                if sock == self.lsock:
-                    conn, addr = self.lsock.accept()
+                if sock == self.server_socket:
+                    conn, addr = self.server_socket.accept()
                     conn.setblocking(False)
                     self.sockets.append(conn)
                     logging.info(f'{datetime.datetime.now()}: New connection from client: {addr}')
@@ -58,26 +60,26 @@ class ServerSocket:
                 else:
                     try:
                         data = sock.recv(BUFSIZE)
-                        print("Server received: " + data.decode())
-
                         if 'has just connected' in data.decode():
                             user = data.decode().split(' ')[0]
                             users.get(list(users)[-1]).append(user)
 
-                        if 'exit' in data.decode():
+                        if 'exit.' in data.decode():
                             self.remove_user(users, sock)
-
                         if data:
                             for s in self.sockets:
-                                if s != self.lsock and s != sock:
+                                if s != self.server_socket and s != sock:
                                     s.send(data)
                         else:
-                            self.remove_user(users, sock)
+                            self.remove_user(users, s)
+
                     except:
                         print("Error in client socket: ")
                         traceback.print_exc()
 
+        #self.server_socket.close()
     def remove_user(self, users, conn):
+
         keyval = None
         for k, v in users.items():
             if conn in v:
@@ -85,25 +87,21 @@ class ServerSocket:
         if keyval:
             del users[keyval]
             logging.info(f'{datetime.datetime.now()}: Connection found! User exited: {v[1]}')
-
-        if conn in self.sockets:
-            print('C == CONN')
+        if conn:
             conn.close()
-            self.sockets.remove(conn)
+        self.sockets.remove(conn)
 
-    def close_server(self):
-        #try:
-        for s in self.sockets:
-            self.sockets.remove(s)
+    def close_server(self, signum, frame):
         print('Remove all sockets...', self.sockets)
-        users.clear()
+        for s in self.sockets:
+            s.close()
+            self.sockets.remove(s)
+        if self.server_socket:
+            self.server_socket.close()
+        #users.clear()
         print('Clean up users: ', users)
-        threading.active_count()
-        sys.exit(5)
-        #except AttributeError:
-        #    print('Server forcibly close... ')
-        #    traceback.print_exc()
-        #    sys.exit(1)
+
+
 class ServerManagerThrd(threading.Thread):
 
     command = ''
@@ -112,26 +110,27 @@ class ServerManagerThrd(threading.Thread):
         self.server_socket = server_socket
         self.thr_stopping = False
     def run(self):
-        commands = ['quit', 'kick', 'listusers']
+        commands = ['quit', 'kick', 'userlist']
         while not self.thr_stopping:
             command = input("You can input command to manage server\n")
             if command not in commands:
                 print('Unknown option: \'', command, '\'')
-            if command == 'listusers':
+            if 'userlist' in command:
                 for k, v in users.items():
                     print('User id: ', k, 'name: ', v[1], ' params: ', v[0])
 
-            elif (command == 'quit'):
-                self.thr_stopping = True
+            elif command == 'quit':
+                #self.thr_stopping = True
                 self.server_socket.stop_falg = True
-                self.server_socket.close_server()
+                print(self.server_socket.stop_falg)
+                break
 
             elif command == 'kick':
                 u = input('Input user to kick: ')
                 if not u:
                     print('No such user or username is empty!')
                 else:
-                    logger.info(f'{u} will be disconnected from the server by admin')
+                    logger.info(f'{datetime.datetime.now()}: \'{u}\' will be disconnected from the server by admin')
                     val = None
                     for k, v in users.items():
                         if u in v:
