@@ -6,7 +6,7 @@ import sys, signal
 
 users = {}
 
-# logger format
+# logger
 logger = logging.getLogger()
 logging.basicConfig(filename="chat_server.log", level=logging.DEBUG)
 logging.info(f'{datetime.datetime.now()}: Chat server started main AChatServer.py')
@@ -117,9 +117,9 @@ class ServerManagerThrd(threading.Thread):
     def run(self):
         commands = ['quit', 'kick', 'userlist']
         while not self.thr_stopping:
-            command = input("You can input command to manage server\n")
+            command = input(f"You can input command to manage server\n")
             if command not in commands:
-                print('Unknown option: \'', command, '\'')
+                print(f'Unknown option: \'{command}\'')
             if 'userlist' in command:
                 for k, v in users.items():
                     print('User id: ', k, 'name: ', v[1], ' params: ', v[0])
