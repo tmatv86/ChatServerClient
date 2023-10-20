@@ -52,7 +52,7 @@ class ServerSocket:
             for sock in rread:
                 if sock == self.server_socket:
                     conn, addr = self.server_socket.accept()
-                    conn.setblocking(False)
+                    # conn.setblocking(False)
                     self.sockets.append(conn)
                     logging.info(f'{datetime.datetime.now()}: New connection from client: {addr}')
                     num_of_clients = num_of_clients + 1
@@ -69,15 +69,22 @@ class ServerSocket:
                         if data:
                             for s in self.sockets:
                                 if s != self.server_socket and s != sock:
-                                    s.send(data)
+                                    try:
+                                        s.send(data)
+                                    except:
+                                        s.close()
+                                        if s in self.sockets:
+                                            self.sockets.remove(s)
+                                            self.remove_user(users, s)
                         else:
-                            self.remove_user(users, s)
+                            if sock in self.sockets:
+                                self.sockets.remove(sock)
+                                self.remove_user(users, sock)
 
                     except:
-                        print("Error in client socket: ")
-                        traceback.print_exc()
+                        logger.info("Client socket offline!\n"+traceback.print_exc())
+                        continue
 
-        #self.server_socket.close()
     def remove_user(self, users, conn):
 
         keyval = None
@@ -87,9 +94,7 @@ class ServerSocket:
         if keyval:
             del users[keyval]
             logging.info(f'{datetime.datetime.now()}: Connection found! User exited: {v[1]}')
-        if conn:
-            conn.close()
-        self.sockets.remove(conn)
+
 
     def close_server(self, signum, frame):
         print('Remove all sockets...', self.sockets)
@@ -101,14 +106,14 @@ class ServerSocket:
         #users.clear()
         print('Clean up users: ', users)
 
-
 class ServerManagerThrd(threading.Thread):
 
     command = ''
-    def __init__(self, server_socket:ServerSocket):
+    def __init__(self, server_socket:ServerSocket, socks):
         threading.Thread.__init__(self)
         self.server_socket = server_socket
         self.thr_stopping = False
+        self.socks = socks
     def run(self):
         commands = ['quit', 'kick', 'userlist']
         while not self.thr_stopping:
@@ -130,6 +135,8 @@ class ServerManagerThrd(threading.Thread):
                 if not u:
                     print('No such user or username is empty!')
                 else:
+                    if v[0] in self.socks:
+                        self.socks.remove(v[0])
                     logger.info(f'{datetime.datetime.now()}: \'{u}\' will be disconnected from the server by admin')
                     val = None
                     for k, v in users.items():
@@ -144,7 +151,7 @@ if __name__ == "__main__":
 
     # server thread manager
     server = ServerSocket(socket, PORT)
-    manageth = ServerManagerThrd(server)
+    manageth = ServerManagerThrd(server, server.sockets)
     manageth.start()
 
     server = ServerSocket("localhost", 65534)
