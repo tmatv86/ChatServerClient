@@ -96,7 +96,7 @@ class ServerSocket:
             logging.info(f'{datetime.datetime.now()}: Connection found! User exited: {v[1]}')
 
 
-    def close_server(self, signum, frame):
+    def close_server(self):
         print('Remove all sockets...', self.sockets)
         for s in self.sockets:
             s.close()
